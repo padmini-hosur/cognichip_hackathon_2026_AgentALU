@@ -1,0 +1,11 @@
+=== Command: pwsh -Command "Get-Content alu_32bit_spec.md | Select-Object -Skip 561 -First 5 | ForEach-Object { '>>>' + $_ + '<<<' }" (2026-04-19T15:22:24.163Z) ===
+Exit Code: 0
+Output:
+[31;1mInvalidArgument: [31;1mCannot convert value "<<<" to type "System.Int32". Error: "The input string '<<<' was not in a correct format."[0m
+[31;1mInvalidArgument: [31;1mCannot convert value "<<<" to type "System.Int32". Error: "The input string '<<<' was not in a correct format."[0m
+[31;1mInvalidArgument: [31;1mCannot convert value "<<<" to type "System.Int32". Error: "The input string '<<<' was not in a correct format."[0m
+[31;1mInvalidArgument: [31;1mCannot convert value "<<<" to type "System.Int32". Error: "The input string '<<<' was not in a correct format."[0m
+[31;1mInvalidArgument: [31;1mCannot convert value "<<<" to type "System.Int32". Error: "The input string '<<<' was not in a correct format."[0m
+
+=== End Output ===
+

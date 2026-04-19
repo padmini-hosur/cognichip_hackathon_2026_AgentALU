@@ -1,0 +1,16 @@
+=== Command: type simulation_results\sim_2026-04-18T19-19-20-038Z\simulation.log (2026-04-18T19:20:07.228Z) ===
+Exit Code: 1
+Output:
+type : Cannot find path 
+'C:\Users\Padmini\OneDrive\Desktop\Agent_ALU\simulation_results\sim_2026-04-18T19-19-20-038Z\simulation.log' because 
+it does not exist.
+At line:1 char:1
++ type simulation_results\sim_2026-04-18T19-19-20-038Z\simulation.log
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\Users\Padmin...\simulation.log:String) [Get-Content], ItemNotFoundEx 
+   ception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 
+
+=== End Output ===
+

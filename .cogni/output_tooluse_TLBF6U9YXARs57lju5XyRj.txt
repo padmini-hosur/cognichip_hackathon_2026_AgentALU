@@ -1,0 +1,234 @@
+=== Command: Set-Content -Path "Buggy_ALU_Assertion_Report.txt" -Encoding UTF8 -Value @"
+================================================================================
+  SVA ASSERTION REPORT -- alu_32bit_buggy.sv
+  Agent-ALU Verification Pipeline
+================================================================================
+  DUT        : alu_32bit_buggy.sv  (3 injected bugs)
+  Assertions : alu_assertions.sv   (17 assertions + 8 cover points)
+  Testbench  : alu_32bit_tb.sv     (38 vectors executed)
+  Tool       : Verilator 5.042  (--assert enabled)
+  DEPS target: bench_alu_32bit_buggy_assert
+  Sim result : 32 PASSED  6 FAILED  (TB checks)
+  SVA result : 6 assertion violations  |  0 errors
+================================================================================
+
+
+--------------------------------------------------------------------------------
+SECTION 1 -- RAW SIMULATION LOG (Assertion Violations)
+--------------------------------------------------------------------------------
+
+  [85000ps]   ASSERT FAIL ast_ovf_equals_ovf_flag:
+              flag_ovf=1 but ovf_flag was 0 (is_arith cycle)
+              alu_assertions.sv:184
+
+  [95000ps]   ASSERT FAIL ast_ovf_equals_ovf_flag:
+              flag_ovf=0 but ovf_flag was 1 (is_arith cycle)
+              alu_assertions.sv:184
+
+  [115000ps]  ASSERT FAIL ast_ovf_equals_ovf_flag:
+              flag_ovf=1 but ovf_flag was 0 (is_arith cycle)
+              alu_assertions.sv:184
+
+  [125000ps]  ASSERT FAIL ast_ovf_equals_ovf_flag:
+              flag_ovf=1 but ovf_flag was 0 (is_arith cycle)
+              alu_assertions.sv:184
+
+  [325000ps]  ASSERT FAIL ast_sra_neg_signext:
+              SRA of negative value did not sign-extend: result=7ffffffc
+              alu_assertions.sv:213
+
+  [345000ps]  ASSERT FAIL ast_sra_neg_signext:
+              SRA of negative value did not sign-extend: result=1
+              alu_assertions.sv:213
+
+  Total violations : 6   |   Tool errors : 0   |   Sim end : 430 ns
+
+
+--------------------------------------------------------------------------------
+SECTION 2 -- TESTBENCH PASS/FAIL (38 vectors)
+--------------------------------------------------------------------------------
+
+  ADD
+    PASS | ADD  5+3=8
+    PASS | ADD  0+0 [zero]
+    FAIL | ADD  0xFFFFFFFF+1 [carry]     got V=1  exp V=0   <-- BUG 1
+    FAIL | ADD  0x7FFFFFFF+1 [pos ovf]   got V=0  exp V=1   <-- BUG 1
+    PASS | ADD  0x80000000+0x80000000
+
+  SUB
+    FAIL | SUB  10-3=7                   got V=1  exp V=0   <-- BUG 1
+    FAIL | SUB  5-5 [zero]               got V=1  exp V=0   <-- BUG 1
+    PASS | SUB  3-10 [neg+borrow]
+    PASS | SUB  0x80000000-1 [neg ovf]
+
+  AND/OR/XOR/NOT/SLL/SRL   (14 vectors -- all PASS)
+
+  SRA
+    FAIL | SRA  0xFFFFFFF8>>>1 [signext] got=7ffffffc exp=fffffffc  <-- BUG 3
+    PASS | SRA  8>>>1=4
+    FAIL | SRA  0x80000000>>>31 [allF]   got=00000001 exp=ffffffff  <-- BUG 3
+
+  MUL/DIV/MOD   (9 vectors -- all PASS)
+
+  TOTAL: 32 PASSED  6 FAILED
+
+
+--------------------------------------------------------------------------------
+SECTION 3 -- ASSERTION STATUS TABLE (17 Assertions)
+--------------------------------------------------------------------------------
+
+  GROUP 1 -- Reset Behaviour
+    A1  ast_reset_result_zero          PASS
+    A2  ast_reset_flags_zero           PASS
+
+  GROUP 2 -- Clock-Gate Stability
+    A3  ast_clkgate_result_stable      PASS
+    A4  ast_clkgate_flags_stable       PASS
+
+  GROUP 3 -- Flag Zero Correctness
+    A5  ast_flag_zero_correct          PASS*  (internal consistency only)
+
+  GROUP 4 -- Flag Neg Correctness
+    A6  ast_flag_neg_correct           PASS*  (internal consistency only)
+
+  GROUP 5 -- Arithmetic Flag Suppression
+    A7  ast_carry_suppressed_non_arith PASS
+    A8  ast_ovf_suppressed_non_arith   PASS
+
+  GROUP 6 -- Divide/Modulo By-Zero Guard
+    A9  ast_div_mod_by_zero_result     PASS   (latent: b_gated==operand_b)
+    A10 ast_div_mod_by_zero_flag       PASS   (latent: b_gated==operand_b)
+
+  GROUP 7 -- Overflow Encoding Correctness
+    A11 ast_ovf_equals_ovf_flag        FAIL   4 violations -- BUG 1 caught
+    A12 ast_ovf_zero_after_non_arith   PASS
+    A13 ast_carry_implies_arith        PASS
+
+  GROUP 9 -- Arithmetic Result Correctness (NEW)
+    A15 ast_sra_neg_signext            FAIL   2 violations -- BUG 3 caught
+    A16 ast_add_result_correct         PASS   (BUG 1 only corrupts flag, not result)
+    A17 ast_sub_result_correct         PASS   (BUG 1 only corrupts flag, not result)
+
+  -----------------------------------------------------------------------
+  TOTAL: 17 assertions | 15 PASS | 2 FAIL | 6 violation events
+  -----------------------------------------------------------------------
+
+  * NOTE on A5 and A6:
+    Both check internal consistency (flag vs result). BUG 3 corrupts result
+    and flags together in the same direction so they agree with each other
+    even though both are wrong. A15 catches BUG 3 by testing the absolute
+    correctness of result[31] after SRA on a negative input.
+
+
+--------------------------------------------------------------------------------
+SECTION 4 -- FAILING ASSERTION DETAIL
+--------------------------------------------------------------------------------
+
+  A11 -- ast_ovf_equals_ovf_flag  (BUG 1, 4 violations)
+  ------------------------------------------------------
+  SVA: (clk_en && is_arith) |=> (flag_ovf == $past(ovf_flag, 1))
+
+  +---+----------+------+------------+------------+-------+---------+---------+
+  | # | Time(ps) | Op   | operand_a  | operand_b  | carry | ovf_flg | flag_ovf|
+  +---+----------+------+------------+------------+-------+---------+---------+
+  | 1 |  85000   | ADD  | 0xFFFFFFFF | 0x00000001 |   1   |    0    |  1 WRONG|
+  | 2 |  95000   | ADD  | 0x7FFFFFFF | 0x00000001 |   0   |    1    |  0 WRONG|
+  | 3 | 115000   | SUB  | 0x0000000A | 0x00000003 |   1   |    0    |  1 WRONG|
+  | 4 | 125000   | SUB  | 0x00000005 | 0x00000005 |   1   |    0    |  1 WRONG|
+  +---+----------+------+------------+------------+-------+---------+---------+
+
+  Buggy line : flag_ovf <= is_arith ? comb_carry : 1'b0;
+  Fix        : flag_ovf <= is_arith ? ovf_flag   : 1'b0;  // BUG FIX 1
+
+
+  A15 -- ast_sra_neg_signext  (BUG 3, 2 violations)
+  --------------------------------------------------
+  SVA: (clk_en && (alu_op == ALU_SRA) && operand_a[31]) |=> (result[31] == 1'b1)
+
+  +---+----------+------+------------+-------+----------+----------+
+  | # | Time(ps) | Op   | operand_a  | shamt | result   | expected |
+  +---+----------+------+------------+-------+----------+----------+
+  | 1 | 325000   | SRA  | 0xFFFFFFF8 |   1   | 7FFFFFFC | FFFFFFFC |
+  | 2 | 345000   | SRA  | 0x80000000 |  31   | 00000001 | FFFFFFFF |
+  +---+----------+------+------------+-------+----------+----------+
+
+  Buggy line : assign shift_fill = 1'b0;
+  Fix        : assign shift_fill = (alu_op == ALU_SRA) ? operand_a[31] : 1'b0;  // BUG FIX 3
+
+
+--------------------------------------------------------------------------------
+SECTION 5 -- BUG DETECTION COVERAGE MATRIX
+--------------------------------------------------------------------------------
+
+  +--------+---------------------------+----------------+--------------------+
+  | Bug ID | Description               | Detected By    | Status             |
+  +--------+---------------------------+----------------+--------------------+
+  | BUG 1  | flag_ovf uses comb_carry  | A11            | CAUGHT  (4 fires)  |
+  | BUG 2  | DIV/MOD guard wrong signal| A9, A10        | LATENT  (0 fires)  |
+  | BUG 3  | shift_fill always 0       | A15 (NEW)      | CAUGHT  (2 fires)  |
+  +--------+---------------------------+----------------+--------------------+
+
+  BUG 2 latent: b_gated==operand_b in all 38 vectors (needs_b=1 for DIV/MOD).
+  Would surface in gate-level sim with ICG cells or system-level integration test.
+
+  Why A16/A17 PASS on buggy DUT:
+    BUG 1 only corrupts flag_ovf. The ADD/SUB result VALUE is correct.
+    A16 and A17 verify result==a+b and result==a-b -- both true even with BUG 1.
+
+
+--------------------------------------------------------------------------------
+SECTION 6 -- COVER POINT STATUS
+--------------------------------------------------------------------------------
+
+  +----+---------------------------+--------+-----------------------------+
+  | ID | Cover Point               | Status | Notes                       |
+  +----+---------------------------+--------+-----------------------------+
+  | C1 | cov_add_carry             | HIT    | ADD 0xFFFFFFFF+1            |
+  | C2 | cov_add_ovf               | MISS   | BUG 1 prevents flag_ovf=1   |
+  | C3 | cov_sub_borrow            | HIT    | SUB 3-10                    |
+  | C4 | cov_sub_ovf               | HIT    | SUB 0x80000000-1            |
+  | C5 | cov_add_zero              | HIT    | ADD 0+0                     |
+  | C6 | cov_shift_neg             | HIT    | SLL 1<<31                   |
+  | C7 | cov_div_by_zero           | HIT    | DIV 100/0                   |
+  | C8 | cov_clk_gate_active       | HIT    | Multiple idle cycles        |
+  +----+---------------------------+--------+-----------------------------+
+
+  C2 MISS: cov_add_ovf requires (alu_op==ALU_ADD && flag_ovf).
+  BUG 1 forces flag_ovf=0 for ADD 0x7FFFFFFF+1. After fixing BUG 1, C2 hits.
+
+
+================================================================================
+  FINAL VERDICT
+================================================================================
+
+  Assertions run    : 17
+  Assertions PASSED : 15
+  Assertions FAILED : 2
+  Total violations  : 6
+
+    A11 ast_ovf_equals_ovf_flag -- 4 violations  (BUG 1: carry used as overflow)
+    A15 ast_sra_neg_signext     -- 2 violations  (BUG 3: shift_fill=0 kills sign)
+
+  Bugs detected : 2 of 3
+  Bugs latent   : 1  (BUG 2: b_gated==operand_b in all 38 vectors)
+
+  RTL fixes required (see alu_32bit_fixed.sv):
+    FIX 1: flag_ovf <= is_arith ? ovf_flag : 1'b0;               (line 233)
+    FIX 2: if (b_gated == 32'b0) in DIV and MOD arms             (lines 168, 176)
+    FIX 3: assign shift_fill = (alu_op==ALU_SRA)?operand_a[31]:1'b0;  (line 88)
+
+  After all 3 fixes: all 17 assertions PASS, all 38 vectors PASS.
+
+================================================================================
+  END OF REPORT
+  DUT    : alu_32bit_buggy.sv
+  Target : bench_alu_32bit_buggy_assert
+  Tool   : Verilator 5.042  |  Sim end: 430 ns
+  Generated by: Cognichip Co-Designer -- Agent-ALU Verification Pipeline
+================================================================================
+"@ (2026-04-19T16:59:35.150Z) ===
+Exit Code: 0
+Output:
+
+=== End Output ===
+

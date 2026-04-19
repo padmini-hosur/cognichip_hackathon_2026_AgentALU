@@ -1,0 +1,13 @@
+=== Command: ls -la *.sv (2026-04-18T02:40:15.736Z) ===
+Exit Code: 1
+Output:
+Get-ChildItem : A parameter cannot be found that matches parameter name 'la'.
+At line:1 char:4
++ ls -la *.sv
++    ~~~
+    + CategoryInfo          : InvalidArgument: (:) [Get-ChildItem], ParameterBindingException
+    + FullyQualifiedErrorId : NamedParameterNotFound,Microsoft.PowerShell.Commands.GetChildItemCommand
+ 
+
+=== End Output ===
+

@@ -1,0 +1,25 @@
+bench_alu_32bit:
+  deps:
+    - alu_32bit.sv
+    - alu_32bit_tb.sv
+  top: alu_32bit_tb
+
+bench_alu_32bit_buggy:
+  deps:
+    - alu_32bit_buggy.sv
+    - alu_32bit_tb.sv
+  top: alu_32bit_tb
+
+bench_alu_32bit_assert:
+  deps:
+    - alu_32bit.sv
+    - alu_assertions.sv
+    - alu_32bit_tb.sv
+  top: alu_32bit_tb
+
+bench_alu_32bit_buggy_assert:
+  deps:
+    - alu_32bit_buggy.sv
+    - alu_assertions.sv
+    - alu_32bit_tb.sv
+  top: alu_32bit_tb

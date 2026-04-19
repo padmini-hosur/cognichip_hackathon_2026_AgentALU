@@ -1,0 +1,58 @@
+=== Command: Set-Content -Path "alu_uvm_tb.sv" -Value @'
+// =============================================================================
+// File        : alu_uvm_tb.sv
+// Description : Top-level UVM testbench module for alu_32bit.
+// =============================================================================
+`timescale 1ns/1ps
+
+module alu_uvm_tb;
+    import uvm_pkg::*;
+    `include "uvm_macros.svh"
+    import alu_pkg::*;
+    import alu_uvm_pkg::*;
+
+    logic clk;
+    initial clk = 1'b0;
+    always  #5 clk = ~clk;
+
+    alu_if dut_if (.clk(clk));
+
+    alu_32bit dut (
+        .clk        (dut_if.clk),
+        .rst_n      (dut_if.rst_n),
+        .alu_op     (dut_if.alu_op),
+        .operand_a  (dut_if.operand_a),
+        .operand_b  (dut_if.operand_b),
+        .shamt      (dut_if.shamt),
+        .result     (dut_if.result),
+        .flag_zero  (dut_if.flag_zero),
+        .flag_neg   (dut_if.flag_neg),
+        .flag_carry (dut_if.flag_carry),
+        .flag_ovf   (dut_if.flag_ovf)
+    );
+
+    initial begin
+        $display("TEST START");
+        uvm_config_db #(virtual alu_if)::set(null, "uvm_test_top.*", "vif", dut_if);
+        run_test("alu_directed_test");
+        $finish;
+    end
+
+    initial begin
+        #500000;
+        $display("TEST FAILED");
+        $fatal(1, "Simulation timeout exceeded 500000 ns");
+    end
+
+    initial begin
+        $dumpfile("dumpfile.fst");
+        $dumpvars(0);
+    end
+
+endmodule : alu_uvm_tb
+'@ (2026-04-18T02:31:32.094Z) ===
+Exit Code: 0
+Output:
+
+=== End Output ===
+

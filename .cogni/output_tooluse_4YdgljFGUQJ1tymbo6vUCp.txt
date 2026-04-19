@@ -1,0 +1,16 @@
+=== Command: New-Item -Path "alu_uvm_tb.sv" -ItemType File -Force (2026-04-18T02:31:10.497Z) ===
+Exit Code: 0
+Output:
+
+
+    Directory: C:\Users\Padmini\OneDrive\Desktop\Agent_ALU
+
+
+Mode                 LastWriteTime         Length Name                                                                 
+----                 -------------         ------ ----                                                                 
+-a----         4/17/2026   7:31 PM              0 alu_uvm_tb.sv                                                        
+
+
+
+=== End Output ===
+

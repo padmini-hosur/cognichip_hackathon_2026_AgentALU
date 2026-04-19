@@ -1,0 +1,9 @@
+=== Command: pwsh -Command "Get-Content alu_32bit_spec.md | Select-Object -Skip 562 -First 3" (2026-04-19T15:21:56.915Z) ===
+Exit Code: 0
+Output:
+| REQ_008 | 3.3, 8.3 | `flag_ovf <= is_arith ? ovf_flag : 1'b0` |
+| REQ_009 | 3.4 (DIV/MOD), 8.4 | `if (b_gated == 32'b0) comb_result = 32'b0` |
+| REQ_010 | 3.4.1, 4.1 | `b_gated`, `sh_gated` assigns |
+
+=== End Output ===
+

@@ -1,0 +1,11 @@
+=== Command: pwsh -Command "(Get-Content alu_32bit_spec.md | Select-String 'REQ_008|REQ_009|REQ_013|REQ_015') | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line }" (2026-04-19T15:07:24.467Z) ===
+Exit Code: 1
+Output:
+[31;1mParserError: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   1 | [0m . 09|REQ_013|REQ_015') | ForEach-Object { .LineNumber.ToString([36;1m)[0m + ': ' .[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m                                                                ~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mAn expression was expected after '('.[0m
+
+=== End Output ===
+

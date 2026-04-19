@@ -1,0 +1,336 @@
+================================================================================
+  AI Analysis Layer — Stage 5 Report
+  Agent-ALU Verification Pipeline
+  DUT : alu_32bit_buggy.sv
+  TB  : alu_32bit_tb.sv  (42 vectors / 38 executed)
+  Tool: Verilator 5.042
+  Result: 32 PASSED  6 FAILED
+================================================================================
+
+
+--------------------------------------------------------------------------------
+SECTION 1 — FAILURE EXPLANATION
+--------------------------------------------------------------------------------
+
+FAIL 1 — ADD 0xFFFFFFFF+1 [carry]
+  Signal    : flag_ovf (V)
+  Expected  : 0
+  Got       : 1
+  All other outputs (result=0x00000000, Z=1, N=0, C=1) are correct.
+
+  In hardware terms, adding 0xFFFFFFFF (-1 in signed two's complement) and +1
+  produces 0x00000000 with an unsigned carry-out of 1.  However, because the
+  two operands have opposite signs (-1 and +1), a signed overflow is impossible
+  by definition — no signed overflow can occur when the addends differ in sign.
+  The overflow flag (V) must therefore be 0.
+
+  The DUT asserts V=1 because BUG 1 replaces the dedicated signed-overflow
+  signal (ovf_flag) with the unsigned carry-out (comb_carry) in the output
+  register.  Since comb_carry=1 for this operation, flag_ovf is incorrectly
+  driven high, falsely signalling a signed overflow that did not occur.  Any
+  downstream signed-branch instruction consuming this flag would misbehave.
+
+----------------------------------------
+
+FAIL 2 — ADD 0x7FFFFFFF+1 [pos ovf]
+  Signal    : flag_ovf (V)
+  Expected  : 1
+  Got       : 0
+  All other outputs (result=0x80000000, Z=0, N=1, C=0) are correct.
+
+  Adding the largest positive 32-bit signed integer (0x7FFFFFFF = +2147483647)
+  and +1 wraps into the negative range (0x80000000 = -2147483648).  This is a
+  textbook positive signed overflow: both inputs are positive, the result is
+  negative.  The overflow flag (V) must be 1.
+
+  The unsigned carry-out of this addition is 0 (no carry out of bit 32), so
+  BUG 1's substitution of comb_carry for ovf_flag produces V=0.  The hardware
+  silently misses a real signed overflow, which would cause silent data
+  corruption in any signed arithmetic pipeline that relies on this flag to
+  detect out-of-range results.
+
+----------------------------------------
+
+FAIL 3 — SUB 10-3=7
+  Signal    : flag_ovf (V)
+  Expected  : 0
+  Got       : 1
+  All other outputs (result=0x00000007, Z=0, N=0, C=1) are correct.
+
+  Subtracting 3 from 10 in signed arithmetic produces +7, a value well within
+  the representable range [-2147483648, +2147483647].  No signed overflow
+  occurs.  The carry flag C=1 correctly indicates "no borrow" (A >= B in the
+  unsigned sense, using the adder convention where SUB = A + ~B + 1).
+
+  BUG 1 feeds the adder carry-out (comb_carry=1) directly into flag_ovf.
+  Because there is no borrow (carry=1), the flag is spuriously set.  A
+  processor relying on the overflow flag after this subtraction would
+  incorrectly conclude the result overflowed a signed range.
+
+----------------------------------------
+
+FAIL 4 — SUB 5-5 [zero]
+  Signal    : flag_ovf (V)
+  Expected  : 0
+  Got       : 1
+  All other outputs (result=0x00000000, Z=1, N=0, C=1) are correct.
+
+  Subtracting equal values produces zero with no borrow and no signed overflow.
+  The carry-out is 1 (representing "no borrow" in the two's-complement
+  subtraction convention).  BUG 1 once again routes this carry-out to flag_ovf,
+  incorrectly asserting overflow for a completely benign subtraction of equal
+  values.  A signed-compare operation checking A==B via subtraction would read
+  a false overflow flag.
+
+----------------------------------------
+
+FAIL 5 — SRA 0xFFFFFFF8>>>1 [signext]
+  Signal    : result, flag_neg (N)
+  Expected  : result=0xFFFFFFFC, N=1
+  Got       : result=0x7FFFFFFC, N=0
+
+  Arithmetically right-shifting 0xFFFFFFF8 (-8 in signed 32-bit) by 1 position
+  should produce 0xFFFFFFFC (-4).  The vacated MSB (bit 31) must be filled with
+  the original sign bit (1) to preserve the sign — this is the defining
+  difference between arithmetic shift right (SRA) and logical shift right (SRL).
+
+  BUG 3 forces shift_fill=0 unconditionally, so the vacated MSB is filled with
+  0 instead of 1.  The result becomes 0x7FFFFFFC (+2147483644), which is a large
+  positive number — the exact opposite sign.  flag_neg is also wrong (0 instead
+  of 1) as a direct consequence of the incorrect MSB.  In hardware, SRA is used
+  to implement signed division by powers of two; this bug turns every such
+  division of a negative number into a large positive result.
+
+----------------------------------------
+
+FAIL 6 — SRA 0x80000000>>>31 [allF]
+  Signal    : result, flag_neg (N)
+  Expected  : result=0xFFFFFFFF, N=1
+  Got       : result=0x00000001, N=0
+
+  Arithmetically right-shifting 0x80000000 (the most-negative 32-bit signed
+  value, -2147483648) by 31 positions should propagate the sign bit (1) across
+  all 32 bit positions, producing 0xFFFFFFFF (-1).  This is the maximum sign
+  extension: 31 vacated positions all filled with 1.
+
+  BUG 3 fills every vacated position with 0.  The 31-position zero-fill shift
+  leaves only the original MSB (1) shifted all the way to bit position 0,
+  yielding 0x00000001 (+1).  All 31 sign-fill bits are wrong.  flag_neg is
+  incorrectly 0.  This completely inverts the sign of the result: -2^31 shifted
+  right by 31 should give -1, but the buggy DUT returns +1.
+
+
+--------------------------------------------------------------------------------
+SECTION 2 — ROOT CAUSE HYPOTHESIS
+--------------------------------------------------------------------------------
+
+BUG 1 — Overflow Flag (causes Fails 1, 2, 3, 4)
+  RTL Section : Section 7 — Output registers (out_reg always_ff block)
+  Logic type  : REGISTERED OUTPUT — the error is in an always_ff assignment,
+                not in combinational logic.  The combinational overflow detector
+                (ovf_flag, computed in Section 2) is correct; the fault is that
+                the wrong signal is latched into the output register.
+  Exact line  : flag_ovf <= is_arith ? comb_carry : 1'b0;
+
+  comb_carry is add_out[32] — the unsigned carry-out of the 33-bit shared adder.
+  ovf_flag is computed in Section 2 as:
+      (~(operand_a[31] ^ b_inv[31])) & (operand_a[31] ^ add_out[31])
+  This detects signed overflow: both inputs same sign, result opposite sign.
+  These two signals are orthogonal conditions.  Using comb_carry in place of
+  ovf_flag creates both false positives (carry=1, overflow=0: Fails 1,3,4) and
+  false negatives (carry=0, overflow=1: Fail 2).
+
+----------------------------------------
+
+BUG 2 — DIV/MOD Guard (latent — 0 failures in this run)
+  RTL Section : Section 5 — Result mux (result_mux always_comb block),
+                ALU_DIV and ALU_MOD case arms
+  Logic type  : COMBINATIONAL LOGIC — a guard condition inside always_comb.
+  Exact lines : if (operand_b == 32'b0)   [in both ALU_DIV and ALU_MOD arms]
+
+  The guard should check b_gated (the power-isolation-gated operand B) rather
+  than operand_b (the raw module input).  For DIV/MOD operations needs_b=1, so
+  b_gated == operand_b in all 38 current test vectors — the signals are
+  identical, masking the bug entirely.  The divergence would surface if this
+  ALU were embedded in a system where operand_b is non-zero but b_gated is
+  forced to zero by a higher-level power management signal, or in a gate-level
+  simulation with ICG cells active.  The bug is latent but architecturally
+  incorrect.
+
+----------------------------------------
+
+BUG 3 — SRA Sign Extension (causes Fails 5, 6)
+  RTL Section : Section 3 — Unified barrel shifter, shift_fill assignment
+  Logic type  : COMBINATIONAL LOGIC — a continuous assign statement.
+  Exact line  : assign shift_fill = 1'b0;
+
+  The 5-level right-shift mux tree uses shift_fill as the bit replicated into
+  all vacated MSB positions during right shifts.  For SRA, shift_fill must be
+  operand_a[31] (the sign bit of the input).  For SRL and (indirectly) SLL,
+  shift_fill must be 0.  The constant-zero assignment eliminates sign extension
+  entirely: every SRA operation with a negative input (MSB=1) behaves
+  identically to SRL, corrupting the result and the flag_neg output.
+
+
+--------------------------------------------------------------------------------
+SECTION 3 — DIRECTED FIX VECTORS
+--------------------------------------------------------------------------------
+
+After applying all three fixes, the following check() calls should all PASS.
+Format: check("label", opcode, operand_a, operand_b, shamt, exp_result, Z,N,C,V)
+
+-- Bug A Fix Verification (flag_ovf correct after BUG 1 repair) --
+
+check("DIR-A1 ADD carry no-ovf",     ALU_ADD, 32'hFFFFFFFE, 32'h00000003, 5'd0, 32'h00000001, 0,0,1,0);
+  // carry=1 (unsigned wrap), but no signed overflow — V must be 0
+
+check("DIR-A2 ADD no-carry pos-ovf", ALU_ADD, 32'h7FFFFFFE, 32'h00000002, 5'd0, 32'h80000000, 0,1,0,1);
+  // carry=0, but both inputs positive and result negative — V must be 1
+
+check("DIR-A3 SUB no-borrow no-ovf", ALU_SUB, 32'h00000064, 32'h00000001, 5'd0, 32'h00000063, 0,0,1,0);
+  // carry=1 (no borrow, A>B), result positive and in range — V must be 0
+
+-- Bug B Fix Verification (DIV/MOD guard correct after BUG 2 repair) --
+
+check("DIR-B1 DIV by zero guard",    ALU_DIV, 32'hDEADBEEF, 32'h00000000, 5'd0, 32'h00000000, 1,0,0,0);
+  // b_gated=0 when operand_b=0 for DIV — result must be 0, Z must be 1
+
+check("DIR-B2 MOD by zero guard",    ALU_MOD, 32'hCAFEBABE, 32'h00000000, 5'd0, 32'h00000000, 1,0,0,0);
+  // b_gated=0 when operand_b=0 for MOD — result must be 0, Z must be 1
+
+check("DIR-B3 DIV normal after 0",   ALU_DIV, 32'h00000064, 32'h00000005, 5'd0, 32'h00000014, 0,0,0,0);
+  // Normal DIV after a by-zero guard — confirms guard does not latch state
+
+-- Bug C Fix Verification (SRA sign extension correct after BUG 3 repair) --
+
+check("DIR-C1 SRA neg shift-1",      ALU_SRA, 32'hFFFFFFF0, 32'hX,        5'd1,  32'hFFFFFFF8, 0,1,0,0);
+  // Negative input shift by 1 — MSB must replicate (fill=1)
+
+check("DIR-C2 SRA neg shift-16",     ALU_SRA, 32'h80000000, 32'hX,        5'd16, 32'hFFFF8000, 0,1,0,0);
+  // Most-negative value shift by 16 — upper 16 bits all 1s
+
+check("DIR-C3 SRA pos shift-4",      ALU_SRA, 32'h7FFFFFF0, 32'hX,        5'd4,  32'h07FFFFFF, 0,0,0,0);
+  // Positive input — fill must be 0 (SRA == SRL for positive values)
+
+
+--------------------------------------------------------------------------------
+SECTION 4 — COVERAGE GAP ANALYSIS
+--------------------------------------------------------------------------------
+
+Opcode  | Flag Combo        | Tested?      | Recommended Fix Vector
+--------|-------------------|--------------|------------------------------------------
+ADD     | C=1, V=0          | NO           | ADD 0xFFFFFFFE+3  -> result=1, C=1, V=0
+ADD     | C=0, V=1          | YES (Fix A2) | ADD 0x7FFFFFFE+2  -> result=0x80000000, V=1
+ADD     | C=1, V=1          | YES          | ADD 0x80000000+0x80000000
+ADD     | C=0, V=0          | YES          | ADD 5+3
+ADD     | N=1               | YES          | ADD 0x7FFFFFFF+1
+ADD     | Z=1, C=1          | YES          | ADD 0xFFFFFFFF+1
+SUB     | C=1, V=0          | NO           | SUB 100-1  -> result=99, C=1, V=0
+SUB     | C=0, V=1          | NO           | SUB 0x80000001-0x7FFFFFFF -> V=1, C=0
+SUB     | C=1, V=1          | YES          | SUB 0x80000000-1
+SUB     | C=0, V=0          | YES          | SUB 3-10
+AND     | Z=1               | YES          | AND 0xAAAA & 0x5555
+AND     | N=1               | YES          | AND 0xFFFF & 0x8000
+AND     | Z=0, N=0          | YES          | AND 0xFF & 0x0F
+OR      | Z=0, N=0 (pos)    | NO           | OR  0x01 | 0x02 -> result=3, Z=0, N=0
+OR      | N=1               | YES          | OR  0xAAAA | 0x5555
+OR      | Z=1               | YES          | OR  0 | 0
+XOR     | Z=1               | YES          | XOR same values
+XOR     | N=1               | YES          | XOR 0x80000001 ^ 0x00000001
+XOR     | Z=0, N=0          | YES          | XOR 0xF ^ 0xA
+NOT     | Z=1               | YES          | NOT 0xFFFFFFFF
+NOT     | N=1               | YES          | NOT 0x00000000
+NOT     | N=0, Z=0          | YES          | NOT 0x7FFFFFFF
+SLL     | N=1               | YES          | SLL 1<<31
+SLL     | Z=1               | NO           | SLL 0<<anything -> result=0, Z=1
+SLL     | N=0, Z=0          | YES          | SLL 1<<4
+SRL     | N=1               | NO (N/A)     | SRL always clears MSB; N=1 impossible
+SRL     | Z=1               | NO           | SRL 0x00000001>>1 -> result=0, Z=1
+SRL     | N=0, Z=0          | YES          | SRL 0xFF>>4
+SRA     | shift by 0        | NO           | SRA 0xDEADBEEF>>>0 -> same value
+SRA     | pos input (Z-fill)| NO           | SRA 0x40000000>>>1 -> 0x20000000, N=0
+SRA     | N=1 (neg input)   | YES (Fix C1) | SRA 0xFFFFFFF8>>>1
+SRA     | Z=1               | NO           | SRA 0x00000000>>>N -> result=0, Z=1
+MUL     | N=1 (neg product) | NO           | MUL 0xFFFFFFFF * 2 -> 0xFFFFFFFE, N=1
+MUL     | Z=1               | YES          | MUL 0 * 0xFFFFFFFF
+MUL     | N=0, Z=0          | YES          | MUL 6*7
+DIV     | Z=1, by-zero      | YES          | DIV 100/0
+DIV     | N=1 (neg result)  | YES          | DIV -42/6
+DIV     | N=0, Z=0          | YES          | DIV 42/6
+DIV     | Z=1, result=0     | NO           | DIV 0/5 -> result=0, Z=1, N=0
+MOD     | N=1 (neg rem)     | YES          | MOD -13%5
+MOD     | Z=1, by-zero      | YES          | MOD 10%0
+MOD     | Z=0, N=0          | YES          | MOD 10%3
+MOD     | Z=1, result=0     | NO           | MOD 10%5 -> result=0, Z=1, N=0
+Any op  | reset-exit check  | NO           | Add explicit check after rst_n assert
+
+
+--------------------------------------------------------------------------------
+SECTION 5 — RTL FIX CODE
+--------------------------------------------------------------------------------
+
+--- FIX 1: Overflow Flag ---
+Location: Section 7, always_ff out_reg block
+
+    // WAS:   flag_ovf   <= is_arith ? comb_carry : 1'b0;
+    //        // BUG 1: uses comb_carry instead of ovf_flag — carry != overflow
+
+    // FIXED: ovf_flag is the dedicated signed overflow detector from Section 2:
+    //        ovf_flag = (~(A[31]^B_inv[31])) & (A[31]^result[31])
+    //        It is true iff both inputs share the same sign AND the result sign
+    //        differs — the only condition that indicates signed overflow.
+    //        comb_carry (add_out[32]) is the UNSIGNED carry-out and is an
+    //        entirely separate condition.
+            flag_ovf   <= is_arith ? ovf_flag : 1'b0;
+
+----------------------------------------
+
+--- FIX 2: DIV/MOD Guard ---
+Location: Section 5, always_comb result_mux, ALU_DIV and ALU_MOD arms
+
+    // ALU_DIV arm:
+    // WAS:   if (operand_b == 32'b0)
+    //        // BUG 2: checks operand_b instead of b_gated — wrong signal in guard
+
+    // FIXED: b_gated is the architecturally correct signal — it is the value
+    //        of operand_b after operand isolation (power gating).  For DIV/MOD,
+    //        needs_b=1 so b_gated==operand_b under normal conditions, but
+    //        b_gated is the signal actually fed to the divider logic.
+            if (b_gated == 32'b0)
+                comb_result = 32'b0;
+            else
+                comb_result = 32'($signed(operand_a) / $signed(b_gated));
+
+    // ALU_MOD arm:
+    // WAS:   if (operand_b == 32'b0)
+    //        // BUG 2: checks operand_b instead of b_gated — wrong signal in guard
+
+    // FIXED: Same correction as ALU_DIV.
+            if (b_gated == 32'b0)
+                comb_result = 32'b0;
+            else
+                comb_result = 32'($signed(operand_a) % $signed(b_gated));
+
+----------------------------------------
+
+--- FIX 3: SRA Sign Extension ---
+Location: Section 3, shift_fill continuous assign
+
+    // WAS:   assign shift_fill = 1'b0;
+    //        // BUG 3: shift_fill always 0 — SRA becomes SRL, sign extension disabled
+
+    // FIXED: Restore the conditional sign-fill expression.
+    //        For ALU_SRA: replicate operand_a[31] (the sign bit) into all
+    //        vacated MSB positions — this implements arithmetic right shift.
+    //        For all other operations: fill with 0 (logical shift or unused).
+    //        Note: SLL does not use shift_fill at all; it bit-reverses the
+    //        input before and after the right-shift tree, so the fill path
+    //        sees shift_left=1 and the fill value is irrelevant for SLL.
+    assign shift_fill = (alu_op == ALU_SRA) ? operand_a[31] : 1'b0;
+
+
+================================================================================
+  END OF REPORT
+  Generated by: Cognichip Co-Designer — AI Analysis Layer (Stage 5)
+  Pipeline    : Agent-ALU Verification
+================================================================================

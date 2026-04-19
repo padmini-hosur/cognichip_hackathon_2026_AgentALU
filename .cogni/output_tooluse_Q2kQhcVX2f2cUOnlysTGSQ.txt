@@ -1,0 +1,15 @@
+=== Command: Remove-Item "alu_32bit_buggy_wrap.sv" -Force (2026-04-18T22:58:00.156Z) ===
+Exit Code: 1
+Output:
+Remove-Item : Cannot find path 'C:\Users\Padmini\OneDrive\Desktop\Agent_ALU\alu_32bit_buggy_wrap.sv' because it does 
+not exist.
+At line:1 char:1
++ Remove-Item "alu_32bit_buggy_wrap.sv" -Force
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\Users\Padmin...t_buggy_wrap.sv:String) [Remove-Item], ItemNotFoundEx 
+   ception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.RemoveItemCommand
+ 
+
+=== End Output ===
+

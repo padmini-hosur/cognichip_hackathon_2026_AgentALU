@@ -1,0 +1,12 @@
+=== Command: Get-Item "Final_Verification_Report.txt" | Select-Object Name, Length, LastWriteTime (2026-04-19T17:08:31.931Z) ===
+Exit Code: 0
+Output:
+
+Name                          Length LastWriteTime        
+----                          ------ -------------        
+Final_Verification_Report.txt  14163 4/19/2026 10:08:22 AM
+
+
+
+=== End Output ===
+

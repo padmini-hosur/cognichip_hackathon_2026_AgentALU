@@ -1,0 +1,9 @@
+=== Command: pwsh -Command "Get-Content alu_32bit_spec.md | Select-Object -Skip 562 -First 3 | ForEach-Object { [System.Text.Encoding]::Unicode.GetBytes($_) | ForEach-Object { $_.ToString('X2') } | Join-String -Separator ' ' }" (2026-04-19T15:21:43.920Z) ===
+Exit Code: 0
+Output:
+[31;1mMethodException: [31;1mCannot find an overload for "GetBytes" and the argument count: "0".[0m
+[31;1mMethodException: [31;1mCannot find an overload for "GetBytes" and the argument count: "0".[0m
+[31;1mMethodException: [31;1mCannot find an overload for "GetBytes" and the argument count: "0".[0m
+
+=== End Output ===
+

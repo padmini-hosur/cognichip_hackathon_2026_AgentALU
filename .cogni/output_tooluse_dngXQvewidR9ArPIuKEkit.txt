@@ -1,0 +1,18 @@
+=== Command: pwsh -Command "Select-String -Path alu_32bit_spec.md -Pattern 'REQ_008|REQ_009|REQ_013|REQ_015' | Select-Object LineNumber, Line" (2026-04-19T15:07:32.524Z) ===
+Exit Code: 0
+Output:
+
+[32;1mLineNumber[0m[32;1m Line[0m
+[32;1m----------[0m [32;1m----[0m
+        59 | REQ_008 | Overflow flag (ADD/SUB only) | Functional | `flag_ovf` reflects signed overflow; forced 0 for a.
+        60 | REQ_009 | Divide-by-zero safety | Functional | `result == 0` when `alu_op ? {ALU_DIV, ALU_MOD}` and `b_ga.
+        64 | REQ_013 | Unified barrel shifter | Area/Perf | Single 5-level mux tree handles SLL, SRL, SRA |
+        66 | REQ_015 | Signed DIV/MOD | Functional | Division and modulo operate on signed 32-bit operands |
+       563 | REQ_008 | 3.3, 8.3 | `flag_ovf <= is_arith ? ovf_flag : 1'b0` |
+       564 | REQ_009 | 3.4 (DIV/MOD), 8.4 | `if (b_gated == 32'b0) comb_result = 32'b0` |
+       568 | REQ_013 | 3.4.3 | `gen_shift_in/out`, `sr0..sr3`, `shift_out_r` |
+       570 | REQ_015 | 7.6, 3.3 | `$signed()` casts in DIV/MOD case arms |
+
+
+=== End Output ===
+

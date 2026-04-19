@@ -1,0 +1,12 @@
+=== Command: Get-Item "Buggy_ALU_Assertion_Report.txt" | Select-Object Name, Length (2026-04-19T16:59:43.365Z) ===
+Exit Code: 0
+Output:
+
+Name                           Length
+----                           ------
+Buggy_ALU_Assertion_Report.txt  10387
+
+
+
+=== End Output ===
+

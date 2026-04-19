@@ -1,0 +1,22 @@
+=== Command: python3 -c "
+content = open('alu_32bit_spec.md', encoding='utf-8').read()
+old = '| REQ_008 | \u00a73.3, \u00a78.3 | \`flag_ovf <= is_arith ? ovf_flag : 1\u0027b0\` |\n|| REQ_009 | \u00a73.4 (DIV/MOD), \u00a78.4 | \`if (b_gated == 32\u0027b0) comb_result = 32\u0027b0\` |'
+new = '| REQ_008 | \u00a73.3, \u00a78.3 | \`flag_ovf <= is_arith ? ovf_flag : 1\u0027b0\` \u2705 Fixed v1.1 (was comb_carry) |\n|| REQ_009 | \u00a73.4 (DIV/MOD), \u00a78.4 | \`if (b_gated == 32\u0027b0) comb_result = 32\u0027b0\` \u2705 Fixed v1.1 (was operand_b) |'
+if old in content:
+    content = content.replace(old, new, 1)
+    print('REPLACED REQ_008/009')
+else:
+    # find the lines
+    for i,line in enumerate(content.split('\n')):
+        if 'REQ_008' in line and 'ovf_flag' in line:
+            print(f'LINE {i}: {repr(line)}')
+        if 'REQ_009' in line and 'b_gated' in line:
+            print(f'LINE {i}: {repr(line)}')
+"
+ (2026-04-19T15:07:11.607Z) ===
+Exit Code: 1
+Output:
+Python was not found; run without arguments to install from the Microsoft Store, or disable this shortcut from Settings > Apps > Advanced app settings > App execution aliases.
+
+=== End Output ===
+
