@@ -77,7 +77,7 @@ Stage 7 — CogniChip generates corrected RTL
 - 32-bit ALU with 12 operations: ADD, SUB, AND, OR, XOR, NOT, SLL, SRL, SRA, MUL, DIV, MOD
 - AI-generated PPA-optimised RTL — 6 hardware optimisation techniques
 - Self-checking testbench — 42 directed vectors, 38 executed in iteration 1
-- **17 SVA assertion properties + 8 cover points** (alu_assertions.sv)
+- 17 SVA assertion properties + 8 cover points** (alu_assertions.sv)
 - AI-driven failure analysis: root cause per RTL section, 9 directed fix vectors
 - Coverage gap analysis: 4 unexecuted vectors identified and explained
 - Iterative closed-loop workflow across 2 simulation iterations
